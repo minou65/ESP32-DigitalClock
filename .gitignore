@@ -31,6 +31,7 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+__vm/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -97,6 +98,9 @@ StyleCopReport.xml
 *.pidb
 *.svclog
 *.scc
+*.vcxproj
+*.filters
+*.user
 
 # Chutzpah Test files
 _Chutzpah*
@@ -396,3 +400,5 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+*.s#1
+/.vscode/settings.json
