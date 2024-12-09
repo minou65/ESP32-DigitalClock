@@ -1,0 +1,6 @@
+# Increment version before build
+recipe.hooks.sketch.prebuild.0.pattern=powershell.exe "P:\Andy\Repos\InkrementVersion\increment.ps1" {build.path} {build.source.path} {build.project_name}
+
+
+#Copy bin file to directory with version number 
+recipe.objcopy.hex.pattern.1.pattern=powershell.exe "P:\Andy\Repos\InkrementVersion\copy-bin.ps1" {vm.last.buildpath}\{build.project_name}.bin C:\Users\andy\OneDrive\Dokumente\Daten\Schiff\bin\{build.board}_{build.project_name}.bin
