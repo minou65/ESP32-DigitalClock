@@ -77,6 +77,12 @@ iotwebconf::CheckboxParameter cUseNTPServer = iotwebconf::CheckboxParameter("Use
 iotwebconf::TextParameter cNTPServerAddress = iotwebconf::TextParameter("NTP server (FQDN or IP address)", "NTPServerParam", vNTPServer, STRING_LEN, "pool.ntp.org");
 iotwebconf::TextParameter cgmtOffset_sec = iotwebconf::TextParameter("POSIX timezones string", "TimeOffsetParam", vTimeZone, STRING_LEN, "CET-1CEST,M3.5.0,M10.5.0/3");
 
+iotwebconf::TextParameter cBacklightOffTime = iotwebconf::TextParameter("Off Time (HH:MM)", "BacklightOffTimeParam", vBacklightOffTime, 6, "22:00");
+iotwebconf::TextParameter cBacklightOnTime = iotwebconf::TextParameter("On Time (HH:MM)", "BacklightOnTimeParam", vBacklightOnTime, 6, "06:00");
+
+iotwebconf::ParameterGroup BacklightGroup = iotwebconf::ParameterGroup("BacklightGroup", "Backlight Settings");
+
+
 HTTPUpdateServer httpUpdater;
 
 void wifiInit() {
@@ -92,6 +98,10 @@ void wifiInit() {
     TimeSourceGroup.addItem(&cNTPServerAddress);
     TimeSourceGroup.addItem(&cgmtOffset_sec);
 
+    BacklightGroup.addItem(&cBacklightOffTime);
+    BacklightGroup.addItem(&cBacklightOnTime);
+
+    iotWebConf.addParameterGroup(&BacklightGroup);
     iotWebConf.addParameterGroup(&TimeSourceGroup);
 
     // -- Define how to handle updateServer calls.
