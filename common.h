@@ -22,5 +22,9 @@ extern bool UseNTPServer;
 extern String NTPServer;
 extern String TimeZone;
 
+
+extern char vBacklightOffTime[6];
+extern char vBacklightOnTime[6];
+
 #endif
 
