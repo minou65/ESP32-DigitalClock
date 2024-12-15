@@ -408,8 +408,5 @@ FodyWeavers.xsd
 *.sln.iml
 *.heic
 .vscode/settings.json
-sch/DCC zDecoder.zip
 /src/board.txt
-/src/zDecoder.ino.nodemcu-32s.bin
-/src/zDecoder.ino.nodemcu-32s.bin
-ESP32-Wanduhr.ino.waveshare_esp32_s3_touch_lcd_7.bin
+*.bin
