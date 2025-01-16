@@ -1,6 +1,11 @@
 
 # ESP32 Wanduhr
 
+## Librarys
+- [lvgl (8.4.0)](https://github.com/lvgl/lvgl/tree/release/v8.4)
+- [ESP Display Panel](https://github.com/esp-arduino-libs/ESP32_Display_Panel/tree/master)
+- [ESP32_IO_Expander (0.1.0)](https://github.com/esp-arduino-libs/ESP32_IO_Expander/releases/tag/v0.1.0)
+
 ## WaveShare
 - [ESP32-S3-Touch-LCD-7](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-7)
 - [Creating lv_conf.h](https://docs.lvgl.io/master/intro/add-lvgl-to-your-project/configuration.html#lv-conf-h)
@@ -35,7 +40,7 @@ Select Sketch > Include Library > Manage Libraries... from the Arduino IDE menus
 - [Arduino](https://docs.lvgl.io/master/details/integration/framework/arduino.html#configure-lvgl)
 
 - https://github.com/lvgl/lvgl/issues/6778
-- Zwischen Version 8 und 9 gibt es einen breaking change. Die Beispiele und bereitgestellenten librarys von Waveshare sind für Version 8.x
+- Zwischen Version 8 und 9 gibt es einen breaking change. Die Beispiele und bereitgestellenten librarys von Waveshare sind fï¿½r Version 8.x
 
 
 ### Font
@@ -44,16 +49,16 @@ Select Sketch > Include Library > Manage Libraries... from the Arduino IDE menus
 - [Font (lv_font)](https://docs.lvgl.io/master/details/main-components/font.html)
 - 
 ### lv_conf.h
-Um die lokale Konfiguration verwednen zu können muss die Datei `lv_conf.h` im Projektordner vorhanden sein. Diese Datei wird von der Bibliothek `lvgl` benötigt. Die Datei `lv_conf.h` kann aus dem Ordner `lvgl` kopiert werden.
+Um die lokale Konfiguration verwednen zu kï¿½nnen muss die Datei `lv_conf.h` im Projektordner vorhanden sein. Diese Datei wird von der Bibliothek `lvgl` benï¿½tigt. Die Datei `lv_conf.h` kann aus dem Ordner `lvgl` kopiert werden.
 
-Danch müssen die  notwendigen Einstellungen für build_flags vorgenommen werden. Für VisualMicro muss dazu unter Projekt Eigenschaften -> Extra Flags folgendes eingetragen werden:
+Danch mï¿½ssen die  notwendigen Einstellungen fï¿½r build_flags vorgenommen werden. Fï¿½r VisualMicro muss dazu unter Projekt Eigenschaften -> Extra Flags folgendes eingetragen werden:
 
 ```
 -D ESP_PANEL_CONF_INCLUDE_SIMPLE -D LV_CONF_INCLUDE_SIMPLE
 ```
 
 ## board.txt
-In der Datei `board.txt` müssen die notwendigen Einstellungen für die Bibliothek `lvgl` vorgenommen werden.
+In der Datei `board.txt` mï¿½ssen die notwendigen Einstellungen fï¿½r die Bibliothek `lvgl` vorgenommen werden.
 
 '''
 board_build.flash_size = 8MB
