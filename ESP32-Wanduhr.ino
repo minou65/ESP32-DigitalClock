@@ -27,6 +27,10 @@
 
 #define PIN_ADC2_CH2 6   //Define the pin macro 
 
+ESP_PanelBacklight* backlight;
+ESP_Panel* panel;
+ESP_IOExpander* expander;
+
 lv_obj_t* text_label_time_value;
 lv_obj_t* text_label_date_value;
 
@@ -93,58 +97,24 @@ void lv_label_set_datetime(lv_timer_t* timer) {
 }
 
 void setup(){
-    Serial.begin(115200);
-    while (!Serial) {
-        delay(10);
-    }
-
-    Serial.println("Starting with Firmware " + String(VERSION));
     String LVGL_Arduino_ = String("LVGL Library Version: ") + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
     Serial.println(LVGL_Arduino_);
 
-    wifiInit();
-    NTPInit();
-
-    /**
-     * These development boards require the use of an IO expander to configure the screen,
-     * so it needs to be initialized in advance and registered with the panel for use.
-     */
-    Serial.println("Initialize IO expander");
-    
-    /* Initialize IO expander */
-    ESP_IOExpander_CH422G *expander = new ESP_IOExpander_CH422G((i2c_port_t)I2C_MASTER_NUM, ESP_IO_EXPANDER_I2C_CH422G_ADDRESS, I2C_MASTER_SCL_IO, I2C_MASTER_SDA_IO);
-    expander->init();
-    expander->begin();
-
-    Serial.println("Set the IO0-7 pin to output mode.");
-    expander->enableAllIO_Output();
-    expander->digitalWrite(TP_RST , HIGH);
-    expander->digitalWrite(LCD_RST , HIGH);
-    expander->digitalWrite(LCD_BL , HIGH);
-    delay(100);
-    
-    // GT911 initialization, must be added, otherwise the touch screen will not be recognized  
-    // Initialization begin
-    expander->digitalWrite(TP_RST , LOW);
-    delay(100);
-    digitalWrite(GPIO_INPUT_IO_4, LOW);
-    delay(100);
-    expander->digitalWrite(TP_RST , HIGH);
-    delay(200);
-    // Initialization end
-
-    Serial.println("Initialize panel device");
-    ESP_Panel *panel = new ESP_Panel();
+    panel = new ESP_Panel();
     panel->init();
-    
 #if LVGL_PORT_AVOID_TEAR
-    // When avoid tearing function is enabled, configure the RGB bus according to the LVGL configuration
-    ESP_PanelBus_RGB *rgb_bus = static_cast<ESP_PanelBus_RGB *>(panel->getLcd()->getBus());
-    rgb_bus->configRgbFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
-    rgb_bus->configRgbBounceBufferSize(LVGL_PORT_RGB_BOUNCE_BUFFER_SIZE);
+    // When avoid tearing function is enabled, configure the bus according to the LVGL configuration
+    ESP_PanelBus* lcd_bus_ = panel->getLcd()->getBus();
+#if ESP_PANEL_LCD_BUS_TYPE == ESP_PANEL_BUS_TYPE_RGB
+    static_cast<ESP_PanelBus_RGB*>(lcd_bus_)->configRgbBounceBufferSize(ESP_PANEL_LCD_WIDTH * 20);
+    static_cast<ESP_PanelBus_RGB*>(lcd_bus_)->configRgbFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
+#elif ESP_PANEL_LCD_BUS_TYPE == ESP_PANEL_BUS_TYPE_MIPI_DSI
+    static_cast<ESP_PanelBus_DSI*>(lcd_bus_)->configDpiFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
 #endif
-
+#endif
     panel->begin();
+
+    expander = panel->getExpander();
 
     Serial.println("Initialize LVGL");
     lvgl_port_init(panel->getLcd(), panel->getTouch());
@@ -160,10 +130,6 @@ void setup(){
 
     /* Release the mutex */
     lvgl_port_unlock();
-
-
-    analogReadResolution(12);  //Set ADC resolution to 12 bits (0-4096)
-
     
 	Serial.println("Setup done");
 }
@@ -188,23 +154,5 @@ void updateDateTime() {
 
 void loop(){
  
-	//updateDateTime();
-
-    wifiLoop();
-    if (iotWebConf.getState() == iotwebconf::OnLine) {
-        NTPloop();
-    }
-    else {
-
-    }
-
-    if (ParamsChanged) {
-
-    }
-
-    ParamsChanged = false;
-
-
-
 
 }
