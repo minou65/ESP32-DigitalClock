@@ -3,18 +3,13 @@
 
 #include <Arduino.h>
 #include <ESP_Panel_Library.h>
-#include <ESP_IOExpander_Library.h>
 #include <time.h> 
 
 #include <lvgl.h>
 
-
-//#include <demos/lv_demos.h>
-
 #include "common.h"
 #include "lv_conf.h"
 #include "lvgl_port_v8.h"
-//#include "lv_font_montserrat_64.h"
 #include "lv_font_robertomonobold_128.h"
 #include "version.h"
 #include "ESP32Time.h"
@@ -110,8 +105,6 @@ void setup(){
     wifiInit();
     NTPInit();
 
-
-    pinMode(GPIO_INPUT_IO_4, OUTPUT);
     /**
      * These development boards require the use of an IO expander to configure the screen,
      * so it needs to be initialized in advance and registered with the panel for use.
