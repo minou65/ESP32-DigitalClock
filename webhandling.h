@@ -23,10 +23,23 @@ extern void wifiInit();
 extern void wifiLoop();
 
 static WiFiClient wifiClient;
-
 extern IotWebConf iotWebConf;
 
+struct NTPSettings_t {
+    bool useNTPServer;
+    const char* ntpServer;
+    const char* timeZone;
+};
 
+struct ScreenSaverSettings_t {
+	int twilightThreshold;
+	const char* offTime;
+	const char* onTime;
+	int offTimeMinutes;
+};
+
+NTPSettings_t getNTPSettings();
+ScreenSaverSettings_t getScreenSaverSettings();
 
 #endif
 
