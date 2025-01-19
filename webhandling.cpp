@@ -71,14 +71,104 @@ IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CON
 
 HTTPUpdateServer httpUpdater;
 
+class NTPSettings : public iotwebconf::ParameterGroup {
+public:
+    NTPSettings(const char* id = "TimeSource", const char* lable = "Time Source")
+        : iotwebconf::ParameterGroup(id, lable) {
+        snprintf(_useNTPServerID, STRING_LEN, "%s-UseNTP", this->getId());
+        snprintf(_ntpServerID, STRING_LEN, "%s-server", this->getId());
+        snprintf(_timeZoneID, STRING_LEN, "%s-tz", this->getId());
+
+        this->addItem(&this->_useNTPServerParam);
+        this->addItem(&this->_ntpServerAddressParam);
+        this->addItem(&this->_gmtOffsetParam);
+    }
+
+    const bool useNTPServer() const {
+        return strcmp(_useNTPServerValue, "selected") == 0;
+    }
+
+    const char* getNTPServer() const {
+        return _ntpServerValue;
+    }
+
+    const char* getTimeZone() const {
+        return _timeZoneValue;
+    }
+
+private:
+    char _useNTPServerValue[10];
+    char _ntpServerValue[30];
+    char _timeZoneValue[30];
+    char _useNTPServerID[STRING_LEN];
+    char _ntpServerID[STRING_LEN];
+    char _timeZoneID[STRING_LEN];
+
+    iotwebconf::CheckboxParameter _useNTPServerParam = iotwebconf::CheckboxParameter("Use NTP server", _useNTPServerID, _useNTPServerValue, 10, true);
+    iotwebconf::TextParameter _ntpServerAddressParam = iotwebconf::TextParameter("NTP server (FQDN or IP address)", _ntpServerID, _ntpServerValue, 30, "pool.ntp.org");
+    iotwebconf::TextParameter _gmtOffsetParam = iotwebconf::TextParameter("POSIX timezones string", _timeZoneID, _timeZoneValue, 30, "CET-1CEST,M3.5.0,M10.5.0/3");
+};
+NTPSettings NTPSettingsGroup;
+
+class ScreenSaver : public iotwebconf::ParameterGroup {
+public:
+    ScreenSaver(const char* id = "Screensaver", const char* lable = "Screensaver")
+        : iotwebconf::ParameterGroup(id, lable) {
+        snprintf(_offTimeID, STRING_LEN, "%s-offTime", this->getId());
+        snprintf(_onTimeID, STRING_LEN, "%s-onTime", this->getId());
+        snprintf(_offTimeMinutesID, STRING_LEN, "%s-offTimeMinutes", this->getId());
+        snprintf(_thresholdID, STRING_LEN, "%s-threshold", this->getId());
+
+        this->addItem(&this->_onTimeParam);
+        this->addItem(&this->_offTimeParam);
+        this->addItem(&this->_offTimeMinutesParam);
+        this->addItem(&this->_thresholdParam);
+    }
+
+    const char* getOffTime() const {
+        return _offTimeValue;
+    }
+
+    const char* getOnTime() const {
+        return _onTimeValue;
+    }
+
+    const int getOffTimeMinutes() const {
+        return atoi(_offTimeMinutesValue);
+    }
+
+    const int getThreshold() const {
+        return atoi(_thresholdValue);
+    }
+
+private:
+    char _offTimeValue[6];
+    char _onTimeValue[6];
+    char _offTimeMinutesValue[5];
+    char _thresholdValue[5];
+    char _offTimeID[STRING_LEN];
+    char _onTimeID[STRING_LEN];
+    char _offTimeMinutesID[STRING_LEN];
+    char _thresholdID[STRING_LEN];
+
+    iotwebconf::TimeParameter _offTimeParam = iotwebconf::TimeParameter("Off Time (HH:MM)", _offTimeID, _offTimeValue, 6, "22:00");
+    iotwebconf::TimeParameter _onTimeParam = iotwebconf::TimeParameter("On Time (HH:MM)", _onTimeID, _onTimeValue, 6, "06:00");
+    iotwebconf::NumberParameter _offTimeMinutesParam = iotwebconf::NumberParameter("Off Time (Minutes)", _offTimeMinutesID, _offTimeMinutesValue, 5, "5", "1..3600", "min='1' max='3600' step='1'");
+    iotwebconf::NumberParameter _thresholdParam = iotwebconf::NumberParameter("Twilight Limit", _thresholdID, _thresholdValue, 5, "100", "100..2500", "min='100' max='2500' step='1'");
+};
+ScreenSaver ScreenSaverGroup;
+
 void wifiInit() {
     Serial.begin(115200);
     Serial.println();
-    Serial.println("starting up...");
+    Serial.println("starting webserver...");
 
     iotWebConf.setConfigPin(CONFIG_PIN);
 
     iotWebConf.setHtmlFormatProvider(&customHtmlFormatProvider);
+
+    iotWebConf.addParameterGroup(&ScreenSaverGroup);
+    iotWebConf.addParameterGroup(&NTPSettingsGroup);
 
     // -- Define how to handle updateServer calls.
     iotWebConf.setupUpdateServer(
@@ -102,7 +192,7 @@ void wifiInit() {
     server.on("/reboot", HTTP_GET, []() { handleReboot(); });
     server.onNotFound([]() { iotWebConf.handleNotFound(); });
 
-    Serial.println("Ready.");
+    Serial.println("webserver is ready");
 }
 
 void wifiLoop() {
@@ -211,4 +301,21 @@ void convertParams() {
 void configSaved() {
     convertParams();
     ParamsChanged = true;
+}
+
+NTPSettings_t getNTPSettings() {
+    NTPSettings_t ntpSettings_;
+    ntpSettings_.useNTPServer = NTPSettingsGroup.useNTPServer();
+    ntpSettings_.ntpServer = NTPSettingsGroup.getNTPServer();
+    ntpSettings_.timeZone = NTPSettingsGroup.getTimeZone();
+    return ntpSettings_;
+}
+
+ScreenSaverSettings_t getScreenSaverSettings() {
+    ScreenSaverSettings_t screenSaverSettings_;
+    screenSaverSettings_.twilightThreshold = ScreenSaverGroup.getThreshold();
+    screenSaverSettings_.offTime = ScreenSaverGroup.getOffTime();
+    screenSaverSettings_.onTime = ScreenSaverGroup.getOnTime();
+    screenSaverSettings_.offTimeMinutes = ScreenSaverGroup.getOffTimeMinutes();
+    return screenSaverSettings_;
 }
