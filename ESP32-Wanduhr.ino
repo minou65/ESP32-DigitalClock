@@ -1,4 +1,4 @@
-
+﻿
 
 
 #include <Arduino.h>
@@ -35,10 +35,6 @@ void configDisplay() {
 
     Serial.println("Display configured");
 }
-
-
-
-
 
 void setup(){
 	Serial.begin(115200);
