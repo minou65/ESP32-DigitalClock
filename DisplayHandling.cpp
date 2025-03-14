@@ -298,7 +298,61 @@ private:
     }
 };
 
+class BinaryClock {
+public:
+    BinaryClock(lv_obj_t* parent) : _parent(parent) {
+        createBinaryMatrix();
 
+        // Create a timer to update the time every second
+        lv_timer_t* timer_ = lv_timer_create(setdatetime, 1000, this);
+    }
+
+    void updateDateTime() {
+        time_t now_ = time(nullptr);
+        struct tm* timeinfo_ = localtime(&now_);
+
+        int hour_ = timeinfo_->tm_hour;
+        int minute_ = timeinfo_->tm_min;
+        int second_ = timeinfo_->tm_sec;
+
+        updateBinaryMatrix(hour_, minute_, second_);
+    }
+
+private:
+    lv_obj_t* _parent;
+    lv_obj_t* _binaryMatrix[3][6]; // 3 rows for hours, minutes, and seconds, 6 columns for binary digits (32, 16, 8, 4, 2, 1)
+
+    static void setdatetime(lv_timer_t* timer) {
+        BinaryClock* clock = static_cast<BinaryClock*>(timer->user_data);
+        clock->updateDateTime();
+    }
+
+    void createBinaryMatrix() {
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 6; ++j) {
+                _binaryMatrix[i][j] = lv_obj_create(_parent);
+                lv_obj_set_size(_binaryMatrix[i][j], 20, 20);
+                lv_obj_align(_binaryMatrix[i][j], LV_ALIGN_CENTER, j * 30 - 75, i * 30 - 45); // Adjust the position
+                lv_obj_set_style_bg_color(_binaryMatrix[i][j], lv_color_black(), 0);
+            }
+        }
+    }
+
+    void updateBinaryMatrix(int hour, int minute, int second) {
+        int values[3] = { hour, minute, second };
+
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 6; ++j) {
+                if (values[i] & (1 << (5 - j))) {
+                    lv_obj_set_style_bg_color(_binaryMatrix[i][j], lv_color_white(), 0);
+                }
+                else {
+                    lv_obj_set_style_bg_color(_binaryMatrix[i][j], lv_color_black(), 0);
+                }
+            }
+        }
+    }
+};
 
 //class AnalogClock {
 //public:
@@ -547,6 +601,7 @@ void initDisplay() {
 	Serial.println("Create the clock");
     //DigitalClock* clock = new DigitalClock(screen_);
 	WordClock* clock = new WordClock(screen_);
+	//BinaryClock* clock = new BinaryClock(screen_);
 
     /* Release the mutex */
     lvgl_port_unlock();
