@@ -2,15 +2,19 @@
 #define LV_CONF_INCLUDE_SIMPLE
 #define LV_LVGL_H_INCLUDE_SIMPLE
 
-#include <ESP_Panel_Library.h>
+#include <esp_display_panel.hpp>
 #include <lvgl.h>
 
 #include "lv_conf.h"
-#include "lvgl_port_v8.h"
+#include "lvgl_v8_port.h"
 #include "lv_font_robertomonobold_128.h"
 #include "lv_font_montserrat_32_umlaut.h"
+#include "lv_font_montserrat_38_umlaut.h"
 #include "DisplayHandling.h"
 #include "neotimer.h"
+
+using namespace esp_panel::drivers;
+using namespace esp_panel::board;
 
 // Extend IO Pin define
 #define TP_RST 1      // Touch screen reset pin
@@ -26,8 +30,8 @@
 #define I2C_MASTER_SCL_IO 9         // I2C clock line pin
 
 ESP_PanelBacklight* backlight;
-ESP_Panel* panel;
 ESP_IOExpander* expander;
+Board* board;
 
 // Array mit deutschen Wochentagen 
 const char* weekdays[] = { "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag" };
@@ -137,10 +141,9 @@ private:
             for (int j = 0; j < 11; ++j) {
                 _letterMatrix[i][j] = lv_label_create(_parent);
                 lv_label_set_text(_letterMatrix[i][j], letters[i][j]);
-                lv_obj_align(_letterMatrix[i][j], LV_ALIGN_CENTER, j * 40 - 200, i * 40 - 200); // Adjust the position
+                lv_obj_align(_letterMatrix[i][j], LV_ALIGN_CENTER, j * 47 - 235, i * 47 - 215); // Angepasst für Schriftgröße 38
                 lv_obj_set_style_text_color(_letterMatrix[i][j], _transparentGray, 0);
                 lv_obj_set_style_text_font(_letterMatrix[i][j], &lv_font_montserrat_32_umlaut, 0);
-                //lv_obj_set_style_text_font(_letterMatrix[i][j], &lv_font_montserrat_32, 0);
             }
         }
     }
@@ -465,7 +468,7 @@ public:
         time_t onTimeSeconds_ = _onTime % 86400; // Sekunden seit Mitternacht
         time_t offTimeSeconds_ = _offTime % 86400; // Sekunden seit Mitternacht
 
-        //// Hilfsfunktion zum Formatieren der Zeit
+        // Hilfsfunktion zum Formatieren der Zeit
         //auto formatTime = [](time_t seconds) {
         //    int hours = seconds / 3600;
         //    int minutes = (seconds % 3600) / 60;
@@ -568,24 +571,31 @@ void initDisplay() {
     String LVGL_Arduino_ = String("LVGL Library Version: ") + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
     Serial.println(LVGL_Arduino_);
 
-    panel = new ESP_Panel();
-    panel->init();
-#if LVGL_PORT_AVOID_TEAR
-    // When avoid tearing function is enabled, configure the bus according to the LVGL configuration
-    ESP_PanelBus* lcd_bus_ = panel->getLcd()->getBus();
-#if ESP_PANEL_LCD_BUS_TYPE == ESP_PANEL_BUS_TYPE_RGB
-    static_cast<ESP_PanelBus_RGB*>(lcd_bus_)->configRgbBounceBufferSize(ESP_PANEL_LCD_WIDTH * 40);
-    static_cast<ESP_PanelBus_RGB*>(lcd_bus_)->configRgbFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
-#elif ESP_PANEL_LCD_BUS_TYPE == ESP_PANEL_BUS_TYPE_MIPI_DSI
-    static_cast<ESP_PanelBus_DSI*>(lcd_bus_)->configDpiFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
-#endif
-#endif
-    panel->begin();
+    Serial.println("Initializing board");
+    Board* board = new Board();
+    board->init();
 
-    expander = panel->getExpander();
+#if LVGL_PORT_AVOID_TEARING_MODE
+    auto lcd_ = board->getLCD();
+    //When avoid tearing function is enabled, the frame buffer number should be set in the board driver
+    lcd_->configFrameBufferNumber(LVGL_PORT_DISP_BUFFER_NUM);
 
-    Serial.println("Initialize LVGL");
-    lvgl_port_init(panel->getLcd(), panel->getTouch());
+    auto lcd_bus = lcd_->getBus();
+    /**
+     * As the anti-tearing feature typically consumes more PSRAM bandwidth, for the ESP32-S3, we need to utilize the
+     * "bounce buffer" functionality to enhance the RGB data bandwidth.
+     * This feature will consume `bounce_buffer_size * bytes_per_pixel * 2` of SRAM memory.
+     */
+    if (lcd_bus->getBasicAttributes().type == ESP_PANEL_BUS_TYPE_RGB) {
+        static_cast<BusRGB*>(lcd_bus)->configRGB_BounceBufferSize(lcd_->getFrameWidth() * 20);
+    }
+#endif
+    assert(board->begin());
+
+    Serial.println("Initializing LVGL");
+    lvgl_port_init(board->getLCD(), board->getTouch());
+
+    expander = board->getIO_Expander()->getBase();
 
     lvgl_port_lock(-1);
 
