@@ -22,8 +22,6 @@ public:
 
         Serial.println(F("ntp initializing..."));
 
-        // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
-        configTzTime(_TimeZone.c_str(), _NTPServer.c_str());
         _NTPSync = true;
         _initialized = true;
 
@@ -32,6 +30,13 @@ public:
 
     void process() {
         if (_NTPTimer.repeat() || _NTPSync) {
+            Serial.println(F("ntp processing..."));
+            Serial.print(F("    Timezone: ")); Serial.println(_TimeZone);
+            Serial.print(F("    NTP server: ")); Serial.println(_NTPServer);
+
+            // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+            configTzTime(_TimeZone.c_str(), _NTPServer.c_str());
+
             struct tm timeinfo_;
             if (getLocalTime(&timeinfo_)) {
                 // _rtc.setTimeStruct(timeinfo_);
