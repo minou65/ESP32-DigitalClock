@@ -10,16 +10,18 @@
 #include <time.h>
 #include "ESP32Time.h"
 
-#include <DNSServer.h>
 #include<iostream>
 #include <string.h>
 
+#include <DNSServer.h>
 #include <IotWebConf.h>
-#include <IotWebConfESP32HTTPUpdateServer.h>
+#include <IotWebConfAsyncClass.h>
+#include <IotWebConfAsyncUpdateServer.h>
+#include <IotWebRoot.h>
+#include <IotWebConfOptionalGroup.h>
 #include "common.h"
 #include "webhandling.h"
 #include "favicon.h"
-#include <IotWebRoot.h>
 
 // -- Configuration specific key. The value should be modified if config structure was changed.
 #define CONFIG_VERSION "1.0"
@@ -42,9 +44,9 @@
 const char thingName[] = "ESP32-Wanduhr";
 
 // -- Method declarations.
-void handleRoot();
-void handleFavIcon();
-void handleReboot();
+void onProgress(size_t prg, size_t sz);
+void handleRoot(AsyncWebServerRequest* request);
+void handleData(AsyncWebServerRequest* request);
 void convertParams();
 
 // -- Callback methods.
@@ -52,9 +54,12 @@ void configSaved();
 void wifiConnected();
 
 bool ParamsChanged = true;
+bool ShouldReboot = false;
 
 DNSServer dnsServer;
-WebServer server(80);
+AsyncWebServer server(80);
+AsyncWebServerWrapper asyncWebServerWrapper(&server);
+AsyncUpdateServer AsyncUpdater;
 
 class CustomHtmlFormatProvider : public iotwebconf::OptionalGroupHtmlFormatProvider {
 protected:
@@ -67,9 +72,7 @@ protected:
 };
 CustomHtmlFormatProvider customHtmlFormatProvider;
 
-IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword, CONFIG_VERSION);
-
-HTTPUpdateServer httpUpdater;
+IotWebConf iotWebConf(thingName, &dnsServer, &asyncWebServerWrapper, wifiInitialApPassword, CONFIG_VERSION);
 
 class NTPSettings : public iotwebconf::ParameterGroup {
 public:
@@ -172,8 +175,8 @@ void wifiInit() {
 
     // -- Define how to handle updateServer calls.
     iotWebConf.setupUpdateServer(
-        [](const char* updatePath) { httpUpdater.setup(&server, updatePath); },
-        [](const char* userName, char* password) { httpUpdater.updateCredentials(userName, password); });
+        [](const char* updatePath) { AsyncUpdater.setup(&server, updatePath, onProgress); },
+        [](const char* userName, char* password) { AsyncUpdater.updateCredentials(userName, password); });
 
     iotWebConf.setConfigSavedCallback(&configSaved);
     iotWebConf.setWifiConnectionCallback(&wifiConnected);
@@ -186,12 +189,43 @@ void wifiInit() {
     convertParams();
 
     // -- Set up required URL handlers on the web server.
-    server.on("/", handleRoot);
-    server.on("/favicon.ico", [] { handleFavIcon(); });
-    server.on("/config", [] { iotWebConf.handleConfig(); });
-    server.on("/reboot", HTTP_GET, []() { handleReboot(); });
-    server.onNotFound([]() { iotWebConf.handleNotFound(); });
-
+    // -- Set up required URL handlers on the web server.
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) { handleRoot(request); });
+    server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse* response = request->beginResponse_P(200, "image/x-icon", favicon_ico, sizeof(favicon_ico));
+        request->send(response);
+        }
+    );
+    server.on("/config", HTTP_ANY, [](AsyncWebServerRequest* request) {
+        Serial.println("Config page requested.");
+        AsyncWebRequestWrapper asyncWebRequestWrapper(request, 4096);
+        Serial.println("Handling config page.");
+        iotWebConf.handleConfig(&asyncWebRequestWrapper);
+        }
+    );
+    server.on("/data", HTTP_GET, [](AsyncWebServerRequest* request) { handleData(request); });
+    server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest* request) {
+        AsyncWebServerResponse* response = request->beginResponse(200, "text/html",
+            "<html>"
+            "<head>"
+            "<meta http-equiv=\"refresh\" content=\"15; url=/\">"
+            "<title>Rebooting...</title>"
+            "</head>"
+            "<body>"
+            "Please wait while the device is rebooting...<br>"
+            "You will be redirected to the homepage shortly."
+            "</body>"
+            "</html>");
+        request->client()->setNoDelay(true); // Disable Nagle's algorithm so the client gets the response immediately
+        request->send(response);
+        ShouldReboot = true;
+        }
+    );
+    server.onNotFound([](AsyncWebServerRequest* request) {
+        AsyncWebRequestWrapper asyncWebRequestWrapper(request);
+        iotWebConf.handleNotFound(&asyncWebRequestWrapper);
+        }
+    );
     Serial.println("webserver is ready");
 }
 
@@ -199,27 +233,15 @@ void wifiLoop() {
     // -- doLoop should be called as frequently as possible.
     iotWebConf.doLoop();
     ArduinoOTA.handle();
+
+    if (ShouldReboot || AsyncUpdater.isFinished()) {
+        delay(1000);
+        ESP.restart();
+    }
 }
 
 void wifiConnected(){
     ArduinoOTA.begin();
-}
-
-void handleFavIcon() {
-   server.send_P(200, "image/x-icon", favicon, sizeof(favicon));
-}
-
-void handleReboot() {
-    String _message;
-
-    // redirect to the root page after 15 seconds
-    _message += "<HEAD><meta http-equiv=\"refresh\" content=\"15;url=/\"></HEAD>\n<BODY><p>\n";
-    _message += "Rebooting...<br>\n";
-    _message += "Redirected after 15 seconds...\n";
-    _message += "</p></BODY>\n";
-
-    server.send(200, "text/html", _message);
-    ESP.restart();
 }
 
 class MyHtmlRootFormatProvider : public HtmlRootFormatProvider {
@@ -228,6 +250,13 @@ public:
         String s_ = F("<tr><td align=\"left\">{n}</td><td align=\"left\"><span id=\"{id}\" class=\"{c}\"></span></td></tr>\n");
         s_.replace("{n}", name);
         s_.replace("{c}", htmlclass);
+        s_.replace("{id}", id);
+        return s_;
+    }
+
+    String getHtmlTableRowVar(String name, String id) {
+        String s_ = F("<tr><td align=\"left\">{n}</td><td align=\"left\" id=\"{id}\">no data</td></tr>\n");
+        s_.replace("{n}", name);
         s_.replace("{id}", id);
         return s_;
     }
@@ -244,18 +273,49 @@ protected:
 
     virtual String getScriptInner() {
         String s_ = HtmlRootFormatProvider::getScriptInner();
-
+        s_.replace("{millisecond}", "1000");
+        s_ += F("function updateData(json) {\n");
+        s_ += F("  document.getElementById('RSSIValue').innerHTML = json.RSSI + \"dBm\" \n");
+        s_ += F("  document.getElementById('DateTimeValue').innerHTML = json.time\n");
+        s_ += F("  document.getElementById('twilightValue').innerHTML = json.twilight\n");
+        s_ += F("}\n");
         return s_;
     }
 };
 
-void handleRoot() {
-    // -- Let IotWebConf test and handle captive portal requests.
-    if (iotWebConf.handleCaptivePortal()){
-        // -- Captive portal request were already served.
-        return;
-    }
+void onProgress(size_t prg, size_t sz) {
+    static size_t lastPrinted = 0;
+    size_t currentPercent = (prg * 100) / sz;
 
+    if (currentPercent % 5 == 0 && currentPercent != lastPrinted) {
+        Serial.printf("Progress: %d%%\n", currentPercent);
+        lastPrinted = currentPercent;
+    }
+}
+
+void handleData(AsyncWebServerRequest* request) {
+    // Get the current time
+    time_t now_ = time(nullptr);
+    struct tm* timeinfo_ = localtime(&now_);
+    char timeStr_[20];
+    char dateStr_[20];
+    strftime(timeStr_, sizeof(timeStr_), "%H:%M:%S", timeinfo_);
+    strftime(dateStr_, sizeof(dateStr_), "%Y-%m-%d", timeinfo_);
+    int currentBrightness_ = 4095 - analogRead(PIN_ADC2_CH2);
+
+    // Create the JSON string
+    String json_ = "{";
+    json_ += "\"RSSI\":\"" + String(WiFi.RSSI()) + "\"";
+    json_ += ",\"time\":\"" + String(timeStr_) + "\"";
+    json_ += ",\"date\":\"" + String(dateStr_) + "\"";
+    json_ += ",\"twilight\":\"" + String(currentBrightness_) + "\"";
+    json_ += "}";
+
+    // Send the JSON response
+    request->send(200, "application/json", json_);
+}
+
+void handleRoot(AsyncWebServerRequest* request) {
     MyHtmlRootFormatProvider rootFormatProvider;
 
     String response_ = "";
@@ -270,6 +330,12 @@ void handleRoot() {
     response_ += F("<fieldset align=left style=\"border: 1px solid\">\n");
     response_ += F("<table border=\"0\" align=\"center\" width=\"100%\">\n");
     response_ += F("<tr><td align=\"left\"><span id=\"DateTimeValue\">not valid</span></td></td><td align=\"right\"><span id=\"RSSIValue\">-100</span></td></tr>\n");
+    response_ += rootFormatProvider.getHtmlTableEnd();
+    response_ += rootFormatProvider.getHtmlFieldsetEnd();
+
+    response_ += rootFormatProvider.getHtmlFieldset("Twilight");
+    response_ += rootFormatProvider.getHtmlTable();
+    response_ += rootFormatProvider.getHtmlTableRowVar("Sensor value:", "twilightValue");
     response_ += rootFormatProvider.getHtmlTableEnd();
     response_ += rootFormatProvider.getHtmlFieldsetEnd();
 
@@ -292,7 +358,7 @@ void handleRoot() {
     response_ += rootFormatProvider.getHtmlTableEnd();
     response_ += rootFormatProvider.getHtmlEnd();
 
-    server.send(200, "text/html", response_);
+    request->send(200, "text/html", response_);
 }
 
 void convertParams() {
