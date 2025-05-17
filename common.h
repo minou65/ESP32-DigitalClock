@@ -14,6 +14,8 @@
 #define STRING_LEN 50
 #define NUMBER_LEN 6
 
+#define PIN_ADC2_CH2 6
+
 extern char Version[];
 
 extern bool ParamsChanged;
