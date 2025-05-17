@@ -12,6 +12,7 @@
 #include "lv_font_montserrat_38_umlaut.h"
 #include "DisplayHandling.h"
 #include "neotimer.h"
+#include "common.h"
 
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
@@ -22,7 +23,6 @@ using namespace esp_panel::board;
 #define LCD_RST 3     // LCD reset pin
 #define SD_CS 4       // SD card select pin
 #define USB_SEL 5     // USB select pin
-#define PIN_ADC2_CH2 6
 
 // I2C pin definitions
 #define I2C_MASTER_NUM I2C_NUM_0    // I2C Master Number
